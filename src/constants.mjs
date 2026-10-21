@@ -42,6 +42,16 @@ export const SDK = Object.freeze({
 export const DOCS = "https://longcat.chat/platform/docs/zh/open-code";
 export const API_KEYS = "https://longcat.chat/platform/api_keys";
 
+/**
+ * The plan name `auth.usage` reports.
+ *
+ * The platform is prepaid pay-as-you-go and publishes no balance endpoint, so
+ * the account's remaining credit is readable only in its console — the pay-as-you-go
+ * page points at 用量管理 for it. The plan name is therefore a sentence that
+ * names where to look rather than a number the plugin has not read.
+ */
+export const PLAN = "API 按量付费（余额见费用中心）";
+
 /** Environment variable the platform accepts for the API key. */
 export const API_KEY_ENV = "LONGCAT_API_KEY";
 
@@ -64,7 +74,31 @@ export const EDITIONS = Object.freeze({
   },
 });
 
-/** Built-in model limits. Sources: docs' "模型参数参考" and pricing pages. */
+/**
+ * The pay-as-you-go rates the platform publishes, per million tokens.
+ *
+ * Both models are priced identically — the platform's own page lists one table
+ * for "LongCat-2.5-Preview、LongCat-2.0" — so one object serves both. The
+ * platform publishes the same table in two currencies, and they are a fixed
+ * conversion of each other (¥2 = $0.30, ¥0.04 = $0.006, ¥8 = $1.20), so the two
+ * editions do not differ in price, only in the currency they bill in.
+ *
+ * These are the platform's *discounted* rates: the page calls them 折扣价 / 限时
+ * and says the platform and its billing records are authoritative. Treat them
+ * as a floor on nothing and a hint on everything else.
+ */
+export const PRICES = Object.freeze({
+  /** Uncached input, the ordinary prompt tokens. */
+  input: 0.3,
+  /** Output, which includes reasoning tokens: the platform bills
+   * `completion_tokens_details.reasoning_tokens` as part of completion. */
+  output: 1.2,
+  /** Cached input. A fiftieth of the uncached rate, which is what makes a
+   * prompt cache worth turning on. */
+  cacheRead: 0.006,
+});
+
+/** Built-in model limits. Source: the docs' "模型参数参考" page. */
 export const MODEL_LIMITS = Object.freeze({
   /** LongCat-2.5-Preview, released 2026-09-25. */
   "LongCat-2.5-Preview": Object.freeze({
@@ -73,8 +107,6 @@ export const MODEL_LIMITS = Object.freeze({
     releaseDate: "2026-09-25",
     description:
       "Meituan LongCat-2.5-Preview: multimodal agentic model with tool calling and a 1M-token context window",
-    /** The prompt-cache discount page lists ¥0.04 per million tokens. */
-    cacheReadCost: 0.00042,
     image: true,
   }),
   /** LongCat-2.0, released 2026-06-30. */
@@ -84,7 +116,6 @@ export const MODEL_LIMITS = Object.freeze({
     releaseDate: "2026-06-30",
     description:
       "Meituan LongCat-2.0: a reasoning model with tool calling and a 1M-token context window",
-    cacheReadCost: 0.00042,
     image: false,
   }),
 });
@@ -107,12 +138,6 @@ export const RETIRED = Object.freeze({
   "LongCat-Flash-Chat-2602-Exp":
     "retired on 2026-05-29, migrate to LongCat-2.0 or LongCat-2.5-Preview",
 });
-
-/**
- * The prompt-cache discount, in US dollars per million tokens. Billing is
- * shown in yuan on the platform; OpenCode's model picker reads dollars.
- */
-export const CACHE_READ_COST_USD = 0.00042;
 
 /**
  * The reasoning effort tiers LongCat's thinking models expose. The model

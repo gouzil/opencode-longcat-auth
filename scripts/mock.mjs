@@ -20,6 +20,15 @@ const hits = [];
 /** The models the stand-in offers, including one the catalog does not describe. */
 const MODELS = ["LongCat-2.5-Preview", "LongCat-2.0", "LongCat-2.5-Flash"];
 
+/**
+ * The rates the platform publishes, per million tokens.
+ *
+ * Mirrored from `src/constants.mjs` so the stand-in answers a model-detail read
+ * the way the platform does. Kept here rather than imported so the sandbox
+ * stays a plain script with no module graph of its own.
+ */
+const PRICING = { prompt: "0.3", completion: "1.2", cached_tokens: "0.006" };
+
 /** A JSON answer. `Bun.serve` wants a `Response`, not a Node-style writable. */
 function json(status, body) {
   return new Response(JSON.stringify(body), {
@@ -66,6 +75,31 @@ const server = Bun.serve({
       return json(200, {
         object: "list",
         data: MODELS.map((id) => ({ id, owned_by: "LongCat" })),
+      });
+    }
+
+    // The platform's model-detail endpoint, which is where a model's own price
+    // is read. The path is `/models/{id}`, so it does not collide with the
+    // list above.
+    if (request.method === "GET" && /\/models\/[^/]+$/.test(path)) {
+      const id = path.split("/").pop();
+      hits.push({ method: "GET", path, auth });
+      if (!signed)
+        return json(401, {
+          error: {
+            code: "invalid_api_key",
+            message: "missing_api_key",
+            type: "authentication_error",
+          },
+        });
+      if (!MODELS.includes(id))
+        return json(404, { error: { message: "no such model" } });
+      return json(200, {
+        id,
+        name: id,
+        created: 1773331200,
+        context_length: 1048576,
+        pricing: PRICING,
       });
     }
 
@@ -120,6 +154,7 @@ const server = Bun.serve({
 
 console.log(`LongCat stand-in on http://127.0.0.1:${server.port}`);
 console.log("  GET  /openai/v1/models");
+console.log("  GET  /openai/v1/models/{model}");
 console.log("  POST /openai/v1/chat/completions");
 console.log("  GET  /__hits   (what was recorded)");
 console.log("  GET  /__reset  (clear it)");

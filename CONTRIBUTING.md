@@ -49,12 +49,16 @@ Read [CLAUDE.md](CLAUDE.md) for the full set. The short version:
 - **The entry exports exactly one plugin.** OpenCode treats every exported function as a plugin, so a helper exported from `index.mjs` breaks loading. Put helpers in `src/`.
 - **The provider id is `opencode-longcat-auth`.** OpenCode already carries a built-in LongCat provider, and a plugin declaring `longcat` has its declaration overridden. Do not rename it.
 - **The `config` hook declares the models.** OpenCode reads a provider's models from the config when the config has them and does not then call `provider.models`.
+- **A cost is flat in the config hook, nested in the resolved Model.** The config hook carries models.dev's `cache_read`/`cache_write`; the resolved `Model` carries `cache.read`/`cache.write`. `mergeCost` in `src/models.mjs` joins the two, and it emits the nested shape alone.
+- **Prices are per million tokens.** The platform quotes per million and so does models.dev, which is what OpenCode reads. A factor of 10^6 wrong here is the difference between a session costing cents and costing a fortune.
 - **Comments record why.** A comment that restates the line below it is noise; one that records a platform quirk, a verified OpenCode behavior, or a decision and its reason is the point. Several comments here record behavior verified against a real OpenCode binary — keep that standard.
 - **No secrets.** Never commit a key, and never log one.
 
 ## Adding a model
 
 Add it to `MODEL_LIMITS` in `src/constants.mjs`. Everything else follows: `CATALOG` in `src/models.mjs` builds from it, the limits and the release date are carried into the picker, and the config hook's declaration picks it up.
+
+A new model gets the `PRICES` table unless the platform prices it differently — it serves one table for every model today. If the platform does publish a per-model rate, put it in the model's `pricing` object and let `discoverPrice` read it: the table stays the floor for a model the endpoint does not price.
 
 If the platform has retired a model, add it to `RETIRED` with the reason rather than deleting it, so an agent that names it is told why it is not offered.
 

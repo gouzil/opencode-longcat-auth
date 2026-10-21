@@ -128,6 +128,40 @@ test("the models hook adds a model the platform lists", async () => {
   expect(models["LongCat-2.5-Flash"]).toBeDefined();
 });
 
+test("the models hook takes the price the platform publishes for a model", async () => {
+  // The platform can change a rate without a release, so the plugin asks each
+  // model what it costs rather than trusting the table it shipped with.
+  const hooks = await plugin({
+    fetchImpl: async (url) => {
+      if (String(url).endsWith("/models/LongCat-2.5-Preview")) {
+        return new Response(
+          JSON.stringify({
+            id: "LongCat-2.5-Preview",
+            pricing: { prompt: "9", completion: "9", cached_tokens: "3" },
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response(
+        JSON.stringify({
+          object: "list",
+          data: [{ id: "LongCat-2.5-Preview" }],
+        }),
+        { status: 200 },
+      );
+    },
+  });
+  const models = await hooks.provider.models(
+    { models: {} },
+    { auth: { type: "api", key: "ak_0123456789abcdef" } },
+  );
+  expect(models["LongCat-2.5-Preview"].cost).toEqual({
+    input: 9,
+    output: 9,
+    cache: { read: 3, write: 0 },
+  });
+});
+
 test("the models hook keeps the catalog when the platform cannot be read", async () => {
   const hooks = await plugin({
     fetchImpl: async () => new Response("nope", { status: 500 }),
@@ -219,12 +253,33 @@ test("the plugin carries the icon and concurrency magpie reads", async () => {
   expect(hooks.auth.maxConcurrency).toBe(4);
 });
 
-test("magpie's usage hook reports the plan", async () => {
+test("magpie's usage hook reports the plan and keeps a working key", async () => {
   const hooks = await plugin();
   const usage = await hooks.auth.usage(async () => ({
     type: "api",
     key: "ak_0123456789abcdef",
   }));
   expect(usage.plan).toContain("按量付费");
-  expect(Array.isArray(usage.windows)).toBe(true);
+  expect(usage.windows).toEqual([]);
+  // A read that succeeded clears any "sign in again" mark on the account.
+  expect(usage.signIn).toBe("kept");
+});
+
+test("magpie's usage hook marks an account whose key stopped working", async () => {
+  const hooks = await plugin({
+    fetchImpl: async () => new Response("nope", { status: 500 }),
+  });
+  const usage = await hooks.auth.usage(async () => ({
+    type: "api",
+    key: "ak_0123456789abcdef",
+  }));
+  expect(usage.error).toContain("500");
+  expect(usage.signIn).toBe("expired");
+});
+
+test("magpie's usage hook says nothing to claim when no key is stored", async () => {
+  const hooks = await plugin();
+  const usage = await hooks.auth.usage(async () => undefined);
+  expect(usage.plan).toContain("按量付费");
+  expect(usage.signIn).toBeUndefined();
 });

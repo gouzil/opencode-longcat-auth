@@ -1,12 +1,12 @@
 import { test, expect } from "bun:test";
 import {
   API_KEYS,
-  CACHE_READ_COST_USD,
   DOCS,
   EDITIONS,
   ICON,
   KEY_PREFIX,
   MODEL_LIMITS,
+  PRICES,
   PROVIDER,
   PROVIDER_NAME,
   RETIRED,
@@ -35,8 +35,19 @@ test("the documented limits are carried", () => {
   expect(MODEL_LIMITS["LongCat-2.0"].output).toBe(131072);
 });
 
-test("the prompt-cache discount is carried in dollars", () => {
-  expect(CACHE_READ_COST_USD).toBe(0.00042);
+test("the published rates are carried, per million tokens", () => {
+  // The platform's discounted rates: $0.30 / $1.20 / $0.006 per 1M tokens, the
+  // same numbers as the ¥2 / ¥8 / ¥0.04 yuan table at a fixed 6.667 conversion.
+  expect(PRICES.input).toBe(0.3);
+  expect(PRICES.output).toBe(1.2);
+  expect(PRICES.cacheRead).toBe(0.006);
+});
+
+test("the cached rate is a real discount on the input rate", () => {
+  // The page bills cached input at a fiftieth of uncached input, which is what
+  // makes a prompt cache worth turning on. A rate at or above the input rate
+  // would mean the discount is not carried.
+  expect(PRICES.cacheRead).toBeLessThan(PRICES.input);
 });
 
 test("the retired models are all listed, with a reason", () => {

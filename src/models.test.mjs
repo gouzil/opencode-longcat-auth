@@ -5,8 +5,10 @@ import {
   capabilities,
   configModels,
   discoverModels,
+  discoverPrice,
   isRetired,
   isValidId,
+  modelEndpoint,
   modelsEndpoint,
 } from "./models.mjs";
 
@@ -63,8 +65,59 @@ test("the config hook declares the provider and both models", () => {
   expect(model.reasoning).toBe(true);
   expect(model.tool_call).toBe(true);
   expect(model.limit.context).toBe(1048576);
-  expect(model.cost.cache.read).toBeGreaterThan(0);
   expect(model.variants).toEqual({ low: {}, medium: {}, high: {} });
+});
+
+test("the config hook publishes the platform's rates in the flat shape", () => {
+  // OpenCode reads this hook's models in models.dev's flat shape, so the
+  // prompt-cache rate is `cache_read`. A nested `cache` object here would be
+  // dropped and every cached token would be priced at the full input rate.
+  const model = configModels(BASE)["LongCat-2.5-Preview"];
+  expect(model.cost).toEqual({
+    input: 0.3,
+    output: 1.2,
+    cache_read: 0.006,
+    cache_write: 0,
+  });
+  // The nested key must not be there: it is not what this shape reads.
+  expect(model.cost.cache).toBeUndefined();
+});
+
+test("provider.models publishes the same rates in the nested shape", () => {
+  // The resolved Model is the other half, and it is the one OpenCode's runtime
+  // cost function reads. The two shapes carry the same numbers.
+  const model = buildModels({ apiBase: BASE })["LongCat-2.5-Preview"];
+  expect(model.cost).toEqual({
+    input: 0.3,
+    output: 1.2,
+    cache: { read: 0.006, write: 0 },
+  });
+});
+
+test("a model the platform lists that the catalog lacks still carries a price", () => {
+  // A discovered model would otherwise cost nothing to run, which reads as free
+  // rather than as unpriced.
+  const model = buildModels({ apiBase: BASE, known: ["LongCat-2.5-Flash"] })[
+    "LongCat-2.5-Flash"
+  ];
+  expect(model.cost.input).toBe(0.3);
+  expect(model.cost.cache.read).toBe(0.006);
+});
+
+test("a flat cache_read from a user's own config overrides the catalog rate", () => {
+  // A user who sets a price in opencode.json gets it, in the shape the runtime
+  // reads, rather than the catalog's rate silently winning.
+  const models = buildModels({
+    apiBase: BASE,
+    providerModels: {
+      "LongCat-2.0": { cost: { input: 9, output: 9, cache_read: 1 } },
+    },
+  });
+  expect(models["LongCat-2.0"].cost).toEqual({
+    input: 9,
+    output: 9,
+    cache: { read: 1, write: 0 },
+  });
 });
 
 test("the model list endpoint is the documented one", () => {
@@ -183,6 +236,61 @@ test("discoverModels reports a network failure rather than throwing", async () =
   });
   expect(ids).toEqual([]);
   expect(error).toContain("ECONNREFUSED");
+});
+
+test("discoverPrice reads the rate the platform publishes for one model", async () => {
+  // The endpoint answers strings, not numbers, which is why `priceOf` parses.
+  const fetchImpl = async (url) => {
+    expect(url).toBe(`${BASE}/openai/v1/models/LongCat-2.5-Preview`);
+    return new Response(
+      JSON.stringify({
+        id: "LongCat-2.5-Preview",
+        pricing: { prompt: "0.3", completion: "1.2", cached_tokens: "0.006" },
+      }),
+      { status: 200 },
+    );
+  };
+  const { price } = await discoverPrice({
+    id: "LongCat-2.5-Preview",
+    apiBase: BASE,
+    key: "ak_x",
+    fetchImpl,
+  });
+  expect(price).toEqual({ input: 0.3, output: 1.2, cacheRead: 0.006 });
+});
+
+test("discoverPrice gives nothing back when the endpoint is unreadable", async () => {
+  // A model the endpoint does not price, or a platform that is down, must not
+  // throw: the caller keeps its built-in table.
+  for (const impl of [
+    async () => new Response("nope", { status: 404 }),
+    async () => new Response("{}", { status: 200 }),
+    async () => {
+      throw new Error("ECONNREFUSED");
+    },
+  ]) {
+    const { price } = await discoverPrice({
+      id: "LongCat-2.5-Preview",
+      apiBase: BASE,
+      key: "ak_x",
+      fetchImpl: impl,
+    });
+    expect(price).toBeUndefined();
+  }
+});
+
+test("buildModels takes the price the platform published over its own table", () => {
+  const models = buildModels({
+    apiBase: BASE,
+    prices: { "LongCat-2.5-Preview": { input: 9, output: 9, cacheRead: 3 } },
+  });
+  expect(models["LongCat-2.5-Preview"].cost).toEqual({
+    input: 9,
+    output: 9,
+    cache: { read: 3, write: 0 },
+  });
+  // A model the platform did not price keeps the catalog's table.
+  expect(models["LongCat-2.0"].cost.input).toBe(0.3);
 });
 
 test("discoverModels does not hang when the platform never answers", async () => {

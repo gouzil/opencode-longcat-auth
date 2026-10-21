@@ -12,10 +12,10 @@ import {
   API_KEY_ENV,
   EDITIONS,
   MODEL_LIMITS,
+  PRICES,
   PROVIDER_NAME,
   RETIRED,
   SDK,
-  CACHE_READ_COST_USD,
   EFFORT_VARIANTS,
 } from "./constants.mjs";
 
@@ -32,8 +32,12 @@ export const CATALOG = Object.freeze(
     releaseDate: limit.releaseDate,
     context: limit.context,
     output: limit.output,
-    cacheRead: limit.cacheReadCost ?? CACHE_READ_COST_USD,
     image: Boolean(limit.image),
+    // Every model the platform serves is priced by the one published table, so
+    // the rates are read off PRICES rather than per model. A model the platform
+    // lists that this plugin has never seen still gets a price, which is what
+    // stops a session's cost reading as zero.
+    price: PRICES,
   })),
 );
 
@@ -85,10 +89,15 @@ function toModel(entry, apiBase) {
       npm: SDK.chat,
     },
     capabilities: capabilities({ image: entry.image }),
+    // The units are the platform's own: the platform quotes per million tokens,
+    // and so does models.dev, whose `cost` object OpenCode reads directly
+    // (`anthropic/claude-sonnet-4-6` is `{"input":3,"output":15}`, which is
+    // Anthropic's published $3/$15 per 1M). Getting this wrong by 10^6 is the
+    // difference between a session costing cents and costing a fortune.
     cost: {
-      input: entry.inputCost ?? 0,
-      output: entry.outputCost ?? 0,
-      cache: { read: entry.cacheRead, write: 0 },
+      input: entry.price.input,
+      output: entry.price.output,
+      cache: { read: entry.price.cacheRead, write: 0 },
     },
     limit: { context: entry.context, output: entry.output },
     status: "active",
@@ -132,13 +141,46 @@ export function configModels(apiBase = EDITIONS.cn.apiBase) {
         input: model.image ? ["text", "image"] : ["text"],
         output: ["text"],
       },
-      cost: { input: 0, output: 0, cache: { read: model.cacheRead, write: 0 } },
+      // The flat models.dev shape, not the nested one: this hook's models are
+      // read by OpenCode's `Tt`/`cQ` converters, which look for `cache_read` and
+      // `cache_write`. A nested `cache` object here is silently dropped, so the
+      // prompt-cache rate would read as zero and every cached token would be
+      // priced at the full input rate. `provider.models` below is the nested
+      // half, and `buildModels` merges both.
+      cost: {
+        input: model.price.input,
+        output: model.price.output,
+        cache_read: model.price.cacheRead,
+        cache_write: 0,
+      },
       limit: { context: model.context, output: model.output },
       options: { thinking: { type: "enabled" } },
       variants: EFFORT_VARIANTS,
     };
   }
   return result;
+}
+
+/**
+ * Overlay one model's cost onto another, in the resolved Model's nested shape.
+ *
+ * The two sources a model can come from name the prompt-cache rate differently:
+ * a config entry carries models.dev's flat `cache_read`, while a resolved Model
+ * carries the nested `cache.read`. Reading both means a user who sets a price in
+ * `opencode.json` gets it, and the result is the nested shape alone — a flat key
+ * left over would put both on the model, where OpenCode reads the nested one and
+ * never the other.
+ */
+function mergeCost(base, over) {
+  const read = over?.cache_read ?? over?.cache?.read ?? base?.cache?.read ?? 0;
+  return {
+    input: over?.input ?? base?.input ?? 0,
+    output: over?.output ?? base?.output ?? 0,
+    cache: {
+      read,
+      write: over?.cache_write ?? over?.cache?.write ?? base?.cache?.write ?? 0,
+    },
+  };
 }
 
 /**
@@ -170,16 +212,34 @@ export function buildModels({
   apiBase = EDITIONS.cn.apiBase,
   providerModels = {},
   known = [],
+  prices = {},
 } = {}) {
   const result = {};
   const chatURL = `${apiBase.replace(/\/+$/, "")}/openai/v1`;
 
   const add = (model) => {
+    // A price the platform itself published wins over the catalog's table, so a
+    // rate it changed is picked up without a release. The live rate names its
+    // cached half `cacheRead` where the catalog nests `cache.read`, so the
+    // overlay is built rather than spread — a straight spread would leave the
+    // cached rate behind. A user's own `cost` still wins over both.
+    const live = prices?.[model.id];
+    const base = live
+      ? {
+          ...model,
+          cost: {
+            ...model.cost,
+            input: live.input,
+            output: live.output,
+            cache: { ...model.cost.cache, read: live.cacheRead },
+          },
+        }
+      : model;
     // `provider.models` hands back the resolved Model objects, whose capability
     // flags are nested under `capabilities`; the config hook's own entries use
     // models.dev's flat names. Both are read, so a model declared either way
     // keeps the fields that were set.
-    const raw = providerModels?.[model.id] ?? {};
+    const raw = providerModels?.[base.id] ?? {};
     const flat = raw.capabilities ? {} : raw;
     const caps = raw.capabilities ?? {
       temperature: raw.temperature ?? true,
@@ -202,20 +262,20 @@ export function buildModels({
       },
       interleaved: { field: "reasoning_content" },
     };
-    result[model.id] = {
-      ...model,
+    result[base.id] = {
+      ...base,
       ...flat,
       capabilities: { ...caps, ...(raw.capabilities ?? {}) },
       api: {
-        id: model.id,
+        id: base.id,
         // A model that declares its own `api.url` keeps it; that address is
         // the one the request must use.
-        url: raw.api?.url ?? model.api?.url ?? chatURL,
-        npm: raw.api?.npm ?? model.api?.npm ?? SDK.chat,
+        url: raw.api?.url ?? base.api?.url ?? chatURL,
+        npm: raw.api?.npm ?? base.api?.npm ?? SDK.chat,
       },
-      limit: { ...model.limit, ...(raw.limit ?? {}) },
-      cost: { ...model.cost, ...(raw.cost ?? {}) },
-      options: { ...(model.options ?? {}), ...(raw.options ?? {}) },
+      limit: { ...base.limit, ...(raw.limit ?? {}) },
+      cost: mergeCost(base.cost, raw.cost),
+      options: { ...(base.options ?? {}), ...(raw.options ?? {}) },
     };
   };
 
@@ -234,7 +294,7 @@ export function buildModels({
           releaseDate: "",
           context: MODEL_LIMITS["LongCat-2.5-Preview"].context,
           output: MODEL_LIMITS["LongCat-2.5-Preview"].output,
-          cacheRead: CACHE_READ_COST_USD,
+          price: PRICES,
           image: false,
         },
         apiBase,
@@ -293,6 +353,62 @@ export async function discoverModels({
       ids: [],
       error: `The model list could not be read: ${error?.message ?? error}`,
     };
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener?.("abort", onAbort);
+  }
+}
+
+/** The detail endpoint for one model, under the same format path as the list. */
+export function modelEndpoint(id, apiBase = EDITIONS.cn.apiBase) {
+  return `${modelsEndpoint(apiBase)}/${encodeURIComponent(id)}`;
+}
+
+/** A price in the platform's own shape, when every part of it is a number. */
+function priceOf(body) {
+  const p = body?.pricing;
+  if (!p || typeof p !== "object") return undefined;
+  const read = (v) => (typeof v === "number" ? v : Number.parseFloat(v));
+  const input = read(p.prompt);
+  const output = read(p.completion);
+  const cacheRead = read(p.cached_tokens);
+  if (![input, output, cacheRead].every((n) => Number.isFinite(n) && n >= 0)) {
+    return undefined;
+  }
+  return { input, output, cacheRead };
+}
+
+/**
+ * Read one model's own price from the platform's model-detail endpoint.
+ *
+ * The endpoint answers `{"pricing":{"prompt":"2","completion":"8",
+ * "cached_tokens":"0.04"}}` — strings, not numbers — and does not state a unit,
+ * so the numbers are taken as per million tokens, matching the pricing page they
+ * are the same numbers as. Returns `undefined` when the endpoint cannot be read
+ * or answers something else, and the caller keeps its built-in table.
+ */
+export async function discoverPrice({
+  id,
+  apiBase = EDITIONS.cn.apiBase,
+  key,
+  signal,
+  fetchImpl = fetch,
+  timeoutMs = 15000,
+} = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const onAbort = () => controller.abort();
+  signal?.addEventListener?.("abort", onAbort, { once: true });
+
+  try {
+    const response = await fetchImpl(modelEndpoint(id, apiBase), {
+      headers: { authorization: `Bearer ${key}`, accept: "application/json" },
+      signal: controller.signal,
+    });
+    if (!response.ok) return { price: undefined };
+    return { price: priceOf(await response.json()) };
+  } catch {
+    return { price: undefined };
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener?.("abort", onAbort);

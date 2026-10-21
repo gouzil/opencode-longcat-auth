@@ -142,6 +142,68 @@ for (const entry of entries) {
     model?.api?.url?.includes("api.longcat.chat"),
   );
 
+  // The resolved Model is the shape OpenCode's cost function reads. Zero here
+  // means a session costs nothing, which reads as free rather than as unpriced —
+  // the failure the published rates exist to prevent.
+  check(
+    "each model carries its published price",
+    model?.cost?.input === 0.3 &&
+      model?.cost?.output === 1.2 &&
+      model?.cost?.cache?.read === 0.006,
+    `input=${model?.cost?.input} output=${model?.cost?.output} cache=${model?.cost?.cache?.read}`,
+  );
+  check(
+    "a model's price is a real discount for cached tokens",
+    model?.cost?.cache?.read > 0 &&
+      model?.cost?.cache?.read < model?.cost?.input,
+  );
+
+  // The config hook's half is read in models.dev's flat shape, so the cache
+  // rate is `cache_read` there and a nested `cache` would be dropped.
+  const declared = bare.provider[id]?.models?.["LongCat-2.5-Preview"];
+  check(
+    "the config hook declares the price in the flat shape",
+    declared?.cost?.input === 0.3 &&
+      declared?.cost?.output === 1.2 &&
+      declared?.cost?.cache_read === 0.006 &&
+      declared?.cost?.cache === undefined,
+    `cache_read=${declared?.cost?.cache_read}`,
+  );
+
+  // magpie's usage hook. The platform publishes no balance endpoint, so a
+  // window would be an invented number: the contract this plugin honours is
+  // "no window" plus a plan that names where the balance is.
+  // The plugin's own fetch is used only when an option sets one; this check
+  // passes a stand-in that answers the model list, so nothing leaves the
+  // process and the read is a success rather than a network failure.
+  const usageHooks = await candidates[0](
+    { project: {}, directory: root, client: {} },
+    {
+      fetchImpl: async () =>
+        new Response(
+          JSON.stringify({
+            object: "list",
+            data: [{ id: "LongCat-2.5-Preview" }],
+          }),
+          { status: 200 },
+        ),
+    },
+  );
+  const usage = await usageHooks.auth.usage?.(async () => ({
+    type: "api",
+    key: "ak_test_0123456789",
+  }));
+  check(
+    "the usage hook invents no quota window",
+    Array.isArray(usage?.windows) && usage.windows.length === 0,
+    `${usage?.windows?.length ?? "no"} windows`,
+  );
+  check(
+    "a successful usage read keeps the account",
+    usage?.signIn === "kept",
+    usage?.signIn ?? "(none)",
+  );
+
   // The loader must produce a fetch and a key.
   const loaderOptions = await hooks.auth.loader?.(async () => ({
     type: "api",

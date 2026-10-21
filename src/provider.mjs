@@ -14,11 +14,17 @@ import {
   DISCOVERY_TIMEOUT_MS,
   EDITIONS,
   ICON,
+  PLAN,
   PROVIDER,
   USER_AGENT,
 } from "./constants.mjs";
 import { editionOf } from "./keys.mjs";
-import { buildModels, configProvider, discoverModels } from "./models.mjs";
+import {
+  buildModels,
+  configProvider,
+  discoverModels,
+  discoverPrice,
+} from "./models.mjs";
 import { chatHeaders, createFetch } from "./fetch.mjs";
 import { thinkingFor } from "./thinking.mjs";
 
@@ -88,11 +94,25 @@ export const LongCatAuthPlugin = async (input, options = {}) => {
           fetch: createFetch({ fetchImpl }),
         };
       },
-      /** magpie only: how much of the plan this account has used. */
+      /**
+       * magpie only: what this account's allowance looks like.
+       *
+       * LongCat is prepaid pay-as-you-go, and the platform publishes no balance
+       * endpoint — the console at `费用中心` is the only place an account's
+       * remaining credit is readable. So there is no window to fill: a
+       * `windows` entry would have to invent a number, and magpie would show it
+       * as the platform's own quota. What can be said honestly is read here:
+       * the key is asked for its model list, so a read that succeeds proves the
+       * key still works, and the plan names where the balance is.
+       *
+       * `signIn: "kept"` is deliberate: the read succeeded, so magpie clears any
+       * "sign in again" mark on the account. That is the host's own signal for
+       * a clean read.
+       */
       async usage(getAuth) {
         const auth = await getAuth();
         const key = auth ? readKey(auth) : undefined;
-        if (!key) return { plan: "API 按量付费", windows: [] };
+        if (!key) return { plan: PLAN, windows: [] };
 
         const { error } = await discoverModels({
           apiBase,
@@ -100,9 +120,13 @@ export const LongCatAuthPlugin = async (input, options = {}) => {
           fetchImpl,
           timeoutMs: DISCOVERY_TIMEOUT_MS,
         });
-        return error
-          ? { plan: "API 按量付费", error, windows: [] }
-          : { plan: "API 按量付费", windows: [] };
+        if (error) {
+          // The key could not be used, so the account is marked. magpie shows
+          // this where the quota window would be and stops sending it requests
+          // until it is signed in again.
+          return { plan: PLAN, error, signIn: "expired", windows: [] };
+        }
+        return { plan: PLAN, signIn: "kept", windows: [] };
       },
     },
 
@@ -131,7 +155,18 @@ export const LongCatAuthPlugin = async (input, options = {}) => {
           if (error) result[Symbol.for("magpie.fellBack")] = true;
           return result;
         }
-        return buildModels({ apiBase, providerModels: stored, known: ids });
+
+        // Each model's own price is read from the platform, so a price it has
+        // changed since this plugin was written shows up without a release. The
+        // catalog's table stays the floor: a model the endpoint does not price,
+        // or an endpoint that cannot be read, keeps it.
+        const prices = await pricesFor({ ids, apiBase, key, fetchImpl });
+        return buildModels({
+          apiBase,
+          providerModels: stored,
+          known: ids,
+          prices,
+        });
       },
     },
 
@@ -179,6 +214,28 @@ function resolveApiBase(options) {
   }
   const edition = options?.edition ?? EDITIONS.cn.id;
   return EDITIONS[edition]?.apiBase ?? EDITIONS.cn.apiBase;
+}
+
+/**
+ * One price per model id, read from the platform.
+ *
+ * Every id is asked at once and the first failure is the whole read's failure,
+ * so a platform that will not answer a detail endpoint costs one round trip per
+ * model rather than one per request. An id the endpoint does not price is left
+ * out, and `buildModels` gives it the catalog's table instead.
+ */
+async function pricesFor({ ids, apiBase, key, fetchImpl }) {
+  const entries = await Promise.all(
+    ids.map(async (id) => {
+      const { price } = await discoverPrice({ id, apiBase, key, fetchImpl });
+      return [id, price];
+    }),
+  );
+  const prices = {};
+  for (const [id, price] of entries) {
+    if (price) prices[id] = price;
+  }
+  return prices;
 }
 
 /** The key an account's requests are signed with. */

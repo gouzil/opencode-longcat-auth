@@ -81,6 +81,36 @@ LongCat's reasoning models take a `thinking` object rather than a `reasoning_eff
 
 The plugin publishes three effort variants — `low`, `medium`, `high` — which map onto a thinking budget of 8,192 / 32,768 / 131,072 tokens. The platform's own maximum is 262,144.
 
+## Pricing
+
+Every model the platform serves is priced by one table, so both models above cost the same. The plugin publishes the platform's rates on each model's `cost` field, which OpenCode uses to show what a session cost:
+
+| Item                     | Per 1M tokens |
+| ------------------------ | ------------- |
+| Input, cache miss        | $0.30         |
+| Input, cache hit         | $0.006        |
+| Output (incl. reasoning) | $1.20         |
+
+These are the platform's **discounted** rates. Its [pricing page](https://longcat.chat/platform/docs/zh/pricing) calls them a limited-time launch promotion and says its own page and billing records are authoritative where the two differ, so treat them as a guide rather than a quote. The platform quotes the same table in yuan (¥2 / ¥0.04 / ¥8) at a fixed conversion; the two editions differ only in the currency they bill in, not in price.
+
+Two things worth knowing:
+
+- **Reasoning tokens are output tokens.** The platform bills `completion_tokens_details.reasoning_tokens` as part of completion, so thinking is charged at the output rate.
+- **A prompt cache is nearly free.** Cache hits cost a fiftieth of a cache miss, which is what makes leaving the cache on worthwhile.
+
+The plugin reads a model's price from the platform's own model-detail endpoint when it can, and falls back to the table above. Set your own rate per model in `opencode.json` if you have an enterprise discount — the platform tiers a further 10–40% off for verified enterprise accounts.
+
+## Usage and balance
+
+LongCat is prepaid pay-as-you-go: you top up a balance and the platform deducts from it as you use tokens. **There is no API for reading that balance** — the platform's console is the only place an account's remaining credit is visible, so the plugin does not pretend otherwise:
+
+| Where    | What you see                                     |
+| -------- | ------------------------------------------------ |
+| OpenCode | What each session cost, at the rates above       |
+| magpie   | The plan name, and a pointer to the balance page |
+
+magpie's usage view has nowhere honest to put a number, because the plugin has no number to put there. Instead the account is marked usable when its key still reads the model list, which is what clears a "sign in again" prompt. Balance and monthly bills are on the platform's [usage page](https://longcat.chat/platform/usage), and top-ups on its [recharge page](https://longcat.chat/platform/cost/recharge).
+
 ## Editions
 
 The platform runs two editions, and the plugin serves either:
