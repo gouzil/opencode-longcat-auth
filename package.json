@@ -1,0 +1,53 @@
+{
+  "name": "opencode-longcat-auth",
+  "version": "0.1.0",
+  "description": "OpenCode provider plugin for the LongCat API platform. Adds the LongCat provider, lists LongCat-2.5-Preview and LongCat-2.0, and sends requests to LongCat with your own API key or OAuth token.",
+  "type": "module",
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./server": "./index.mjs"
+  },
+  "files": [
+    "index.mjs",
+    "src/**",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "opencode-auth",
+    "provider",
+    "longcat",
+    "meituan"
+  ],
+  "homepage": "https://github.com/gouzil/opencode-longcat-auth",
+  "bugs": {
+    "url": "https://github.com/gouzil/opencode-longcat-auth/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gouzil/opencode-longcat-auth.git"
+  },
+  "license": "MIT",
+  "author": "gouzil",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "bun test",
+    "check": "bun scripts/check.mjs",
+    "mock": "bun scripts/mock.mjs",
+    "try": "bun scripts/try.mjs",
+    "fmt": "bunx prettier --write .",
+    "fmt:check": "bunx prettier --check .",
+    "lint": "bun run scripts/check.mjs",
+    "ci": "bun run fmt:check && bun run test && bun run check"
+  },
+  "magpie": {
+    "icon": "https://s3plus.meituan.net/elsa-multimedia-data/longcat/logo-group.svg",
+    "maxConcurrency": 4
+  },
+  "devDependencies": {}
+}
