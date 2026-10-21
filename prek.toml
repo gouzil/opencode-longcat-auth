@@ -7,8 +7,9 @@
 #   prek run --all-files
 #
 # The `builtin` repo is prek's own, so the checks below need nothing fetched.
-# The local repo is this repository's own: the formatter, the unit tests, and
-# the plugin check, so a commit cannot carry a broken plugin.
+# The local repo is this repository's own: the formatter, the unit tests, the
+# plugin check, and the API-key check, so a commit cannot carry a broken plugin
+# or a credential.
 
 # The checks prek ships, in place of the pre-commit-hooks repo.
 [[repos]]
