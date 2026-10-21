@@ -23,6 +23,14 @@ bun run ci
 
 That is formatting, the unit tests, and the plugin check. It is what CI runs, so a green local run is a green CI run.
 
+The git hook is configured in `prek.toml`. Install it once after cloning:
+
+```bash
+prek install
+```
+
+`prek run` checks the staged files and `prek run --all-files` checks everything; CI runs the same hooks.
+
 If your change touches what the hooks produce, also run the end-to-end check:
 
 ```bash

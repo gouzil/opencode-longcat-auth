@@ -1,0 +1,48 @@
+# Configuration file for `prek`, a git hook framework written in Rust.
+# See https://prek.j178.dev for more information.
+#:schema https://www.schemastore.org/prek.json
+#
+#   prek install            # put the hooks in .git/hooks/pre-commit
+#   prek run                # run them on the staged files
+#   prek run --all-files
+#
+# The `builtin` repo is prek's own, so the checks below need nothing fetched.
+# The local repo is this repository's own: the formatter, the unit tests, and
+# the plugin check, so a commit cannot carry a broken plugin.
+
+# The checks prek ships, in place of the pre-commit-hooks repo.
+[[repos]]
+repo = "builtin"
+hooks = [
+  { id = "check-yaml" },
+  { id = "check-json" },
+  { id = "check-toml" },
+  { id = "end-of-file-fixer" },
+  { id = "trailing-whitespace" },
+  { id = "mixed-line-ending" },
+  { id = "check-added-large-files" },
+  { id = "check-merge-conflict" },
+  { id = "detect-private-key" },
+]
+
+# This repository's own checks.
+[[repos]]
+repo = "local"
+hooks = [
+  # The formatter runs through bun, so the hook and `bun run fmt:check` use the
+  # same Prettier. The mirrors-prettier repo was avoided: it lags the released
+  # Prettier, and the two have disagreed over optional-chaining parentheses,
+  # which makes a file pass one check and fail the other.
+  { id = "prettier", name = "prettier", entry = "bunx prettier --write", language = "system", types_or = [
+    "markdown",
+    "json",
+    "yaml",
+    "javascript",
+  ] },
+  { id = "bun-test", name = "unit tests", entry = "bun test", language = "system", files = '\.(mjs|js)$', pass_filenames = false },
+  { id = "bun-check", name = "plugin check", entry = "bun scripts/check.mjs", language = "system", files = '\.(mjs|js|json|md)$', pass_filenames = false },
+  # `detect-private-key` above reads PEM blocks, which an `ak_…` key is not, so
+  # the platform's own key shape is checked here. The values the tests and the
+  # sandbox use are placeholders — short, and named for it — so they pass.
+  { id = "no-api-key", name = "no API key committed", entry = "bun scripts/no-api-key.mjs", language = "system", pass_filenames = false },
+]

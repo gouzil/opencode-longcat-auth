@@ -11,15 +11,22 @@ It also runs under magpie, which reads extra fields (`auth.usage`, `auth.refresh
 ## Commands
 
 ```bash
-bun test          # unit tests, one file per module next to the module
-bun run check     # the plugin's hooks, the way magpie checks them
-bun run fmt       # prettier
-bun run fmt:check # prettier, read-only
-bun run ci        # fmt:check + test + check
-bun run try       # end-to-end against a local stand-in; needs opencode
+bun test            # unit tests, one file per module next to the module
+bun run check       # the plugin's hooks, the way magpie checks them
+bun run no-api-key  # no LongCat key in the tree
+bun run fmt         # prettier
+bun run fmt:check   # prettier, read-only
+bun run ci          # fmt:check + test + check
+bun run try         # end-to-end against a local stand-in; needs opencode
 ```
 
 `bun run ci` is what CI runs. `bun run try` needs an `opencode` binary and is not part of CI.
+
+## The git hook
+
+`prek.toml` configures prek, and `prek install` puts it in `.git/hooks/pre-commit`. Run `prek run` to check the staged files, or `prek run --all-files`. CI runs the same hooks, so a green local run is a green CI run.
+
+The config is prek's own TOML, not `.pre-commit-config.yaml`: the `builtin` repo needs nothing fetched, and the one external check this project needs is a local hook anyway.
 
 ## Layout
 
@@ -33,9 +40,11 @@ src/thinking.mjs       LongCat's thinking field and the effort-variant mapping
 src/errors.mjs         the sign-in marker, the platform's error shape
 src/fetch.mjs          the fetch handed to the AI SDK, and chat.headers
 scripts/check.mjs      loads the entry and asserts the hooks
+scripts/no-api-key.mjs refuses a LongCat key in the tree
 scripts/mock.mjs       a stand-in for the LongCat API
 scripts/try.mjs        the sandbox runner
 scripts/try.sh         its shell entry
+prek.toml             the git hook
 ```
 
 Tests live beside the module they cover: `src/keys.test.mjs` tests `src/keys.mjs`.

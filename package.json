@@ -38,6 +38,7 @@
   "scripts": {
     "test": "bun test",
     "check": "bun scripts/check.mjs",
+    "no-api-key": "bun scripts/no-api-key.mjs",
     "mock": "bun scripts/mock.mjs",
     "try": "bun scripts/try.mjs",
     "fmt": "bunx prettier --write .",
