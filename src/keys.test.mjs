@@ -1,53 +1,19 @@
 import { test, expect } from "bun:test";
-import { editionOf, fingerprint, isPlatformKey, isUnusable } from "./keys.mjs";
-
-test("a key in the platform's shape is recognised", () => {
-  expect(isPlatformKey("ak_0123456789abcdef")).toBe(true);
-  expect(isPlatformKey("sk-0123456789abcdef")).toBe(false);
-  expect(isPlatformKey("ak_")).toBe(false);
-  expect(isPlatformKey(undefined)).toBe(false);
-});
-
-test("a placeholder from the docs is refused", () => {
-  expect(isUnusable("YOUR_APP_KEY")).toBe("placeholder");
-  expect(isUnusable("your-app-key")).toBe("placeholder");
-  expect(isUnusable("ak_real_key_here")).toBeUndefined();
-});
-
-test("an empty key is refused", () => {
-  expect(isUnusable("")).toBe("empty");
-  expect(isUnusable("   ")).toBe("empty");
-});
-
-test("a key with whitespace inside it is refused", () => {
-  expect(isUnusable("ak_two words")).toContain("whitespace");
-});
-
-test("a key with whitespace around it is refused", () => {
-  expect(isUnusable("  ak_x  ")).toContain("whitespace");
-});
-
-test("a too-short key is refused", () => {
-  expect(isUnusable("ak_ab")).toBe("too short");
-});
-
-test("a fingerprint shows the ends and never the middle", () => {
-  // A placeholder, so the key check does not read it as a real one.
-  const key = "ak_0000test0000key0000";
-  const printed = fingerprint(key);
-  expect(printed).toContain("ak_00");
-  expect(printed).toContain("0000");
-  expect(printed).toContain("…");
-  expect(printed).not.toBe(key);
-});
-
-test("a short value is fingerprinted by its tail alone", () => {
-  expect(fingerprint("ak_x")).toBe("…ak_x");
-  expect(fingerprint("")).toBe("…");
-});
+import { editionOf } from "./keys.mjs";
 
 test("the edition is read off a global-shaped key", () => {
   expect(editionOf("ak_g0123456789abcdef")).toBe("global");
   expect(editionOf("ak_0123456789abcdef")).toBe("cn");
+});
+
+test("a value that is not a platform key reads as the default edition", () => {
+  // Every edition marker is a guess at the contents, and a host may store a
+  // key this plugin did not shape, so the default is the one the loader uses.
   expect(editionOf("not-a-key")).toBe("cn");
+  expect(editionOf("")).toBe("cn");
+  expect(editionOf(undefined)).toBe("cn");
+});
+
+test("whitespace around a key does not hide its edition", () => {
+  expect(editionOf("  ak_g0123456789abcdef  ")).toBe("global");
 });

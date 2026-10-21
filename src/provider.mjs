@@ -11,14 +11,13 @@
  */
 
 import {
-  API_KEYS,
   DISCOVERY_TIMEOUT_MS,
   EDITIONS,
   ICON,
   PROVIDER,
   USER_AGENT,
 } from "./constants.mjs";
-import { editionOf, fingerprint, isPlatformKey, isUnusable } from "./keys.mjs";
+import { editionOf } from "./keys.mjs";
 import { buildModels, configProvider, discoverModels } from "./models.mjs";
 import { chatHeaders, createFetch } from "./fetch.mjs";
 import { thinkingFor } from "./thinking.mjs";
@@ -56,33 +55,18 @@ export const LongCatAuthPlugin = async (input, options = {}) => {
       icon: ICON,
       maxConcurrency: options.maxConcurrency ?? 4,
       methods: [
+        // An `api` method is declared without `authorize`, which is what makes
+        // the key land. Both hosts treat it as the one shape that carries a
+        // typed value: OpenCode's CLI stores the key itself, and its desktop
+        // returns before an api method's `authorize` is reached. magpie's host
+        // calls `authorize(inputs)` with the *answers to prompts* — never the
+        // key, which its UI sends as a top-level argument the host stores
+        // directly. An `authorize` here that looked for the key in `inputs`
+        // therefore saw an empty key for every login.
         {
           type: "api",
           label: "LongCat API key",
           placeholder: "ak_…",
-          async authorize(inputs) {
-            const given = inputs?.key?.trim() ?? "";
-            const problem = isUnusable(given);
-            if (problem) {
-              return {
-                type: "failed",
-                error:
-                  problem === "placeholder"
-                    ? "That is the placeholder from the docs. Paste your own key."
-                    : `That key is ${problem}. Paste the key from ${API_KEYS}.`,
-              };
-            }
-            const edition = inputs?.edition ?? editionOf(given);
-            return {
-              type: "success",
-              key: given,
-              metadata: {
-                edition,
-                label: fingerprint(given),
-                ...(isPlatformKey(given) ? {} : { shape: "other" }),
-              },
-            };
-          },
         },
       ],
       /** What this account's requests are sent with. */

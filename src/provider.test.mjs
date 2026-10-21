@@ -51,27 +51,16 @@ test("the auth hook offers one API-key login", async () => {
   expect(hooks.auth.methods[0].label).toContain("LongCat");
 });
 
-test("a key is accepted and carries its edition", async () => {
+test("the API-key login declares no authorize", async () => {
+  // The shape that works in both hosts. magpie's host calls `authorize` with
+  // the answers to a method's prompts — the typed key reaches it as a separate
+  // argument the host stores itself — and OpenCode returns before an api
+  // method's `authorize` is reached at all. An `authorize` that looked for the
+  // key in `inputs` saw an empty key on every login.
   const hooks = await plugin();
-  const result = await hooks.auth.methods[0].authorize({
-    key: "ak_0123456789abcdef",
-  });
-  expect(result.type).toBe("success");
-  expect(result.key).toBe("ak_0123456789abcdef");
-  expect(result.metadata.edition).toBe("cn");
-});
-
-test("a key that is the docs' placeholder is refused", async () => {
-  const hooks = await plugin();
-  const result = await hooks.auth.methods[0].authorize({ key: "YOUR_APP_KEY" });
-  expect(result.type).toBe("failed");
-  expect(result.error).toContain("placeholder");
-});
-
-test("an empty key is refused", async () => {
-  const hooks = await plugin();
-  const result = await hooks.auth.methods[0].authorize({ key: "   " });
-  expect(result.type).toBe("failed");
+  const method = hooks.auth.methods[0];
+  expect(method.authorize).toBeUndefined();
+  expect(method.prompts).toBeUndefined();
 });
 
 test("the loader returns nothing for an account with no key", async () => {

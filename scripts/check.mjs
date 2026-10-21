@@ -88,6 +88,18 @@ for (const entry of entries) {
     ),
   );
 
+  // A method that takes a typed key is declared without `authorize`. magpie's
+  // host passes the key to the host itself, not into `authorize` (which gets
+  // the answers to prompts), and OpenCode never reaches an api method's
+  // `authorize`. Declaring one that reads the key from `inputs` is how a login
+  // comes to fail with an empty key.
+  const apiMethods = auth.methods.filter((m) => m.type === "api");
+  check(
+    "api methods declare no authorize",
+    apiMethods.every((m) => typeof m.authorize !== "function"),
+    `${apiMethods.length} api method(s)`,
+  );
+
   // The config hook must not overwrite a provider the user configured.
   const id = auth.provider;
   const cfg = { provider: { [id]: { name: "Mine" } } };

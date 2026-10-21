@@ -67,9 +67,11 @@ Tests live beside the module they cover: `src/keys.test.mjs` tests `src/keys.mjs
 
 **The sign-in marker's message names the fix.** A 401 whose code is `invalid_api_key`, `insufficient_quota` or `balance_exhausted` points at the key page; anything else points at `opencode auth login`.
 
+**An `api` login is declared without `authorize`.** Both hosts treat that as the shape that carries a typed key: magpie's host stores the key it is handed, and OpenCode never reaches an api method's `authorize`. A method that declared `authorize(inputs)` and read the key from `inputs` failed every login with an empty key, because `inputs` holds prompt answers and a method with no prompts gets none.
+
 **Comments say why, not what.** The codebase is commented for a reader who can see the code. A comment that restates the line below it is noise; a comment that records a platform quirk, a verified OpenCode behavior, or a decision and its reason is the point. Several comments here record behavior that was verified against a real OpenCode binary — keep that standard.
 
-**No secrets.** Keys are read from `auth.json` or the environment. A key is never logged, and `fingerprint` exists so an account can be named without printing one. Never ask for a key in chat or commit one.
+**No secrets.** Keys are read from `auth.json` or the environment. A key is never logged. Never ask for a key in chat or commit one.
 
 ## Testing
 
@@ -89,3 +91,10 @@ These were established by running the real binary, not by reading its source. Th
 - The `plugins` config key is **not** read by 1.x — it is reported as an unsupported native setting and omitted. Use `plugin` (deprecated but honored).
 - When the config hook declares models, `provider.models` is not called. Hence the declaration in `config`.
 - `opencode run` leaves a TUI behind when its output is a pipe, so it must be run with a timeout.
+
+## Verified against magpie's plugin host
+
+Read from magpie's own host bundle and its sign-in UI, not from its docs.
+
+- **An `api` method declares no `authorize`.** magpie's UI sends the typed key as a top-level argument — `api("plugin-signin", {provider, method, inputs, key})` — and its host stores it directly when the method has no `authorize`. When the method _has_ one, the host calls it with `m.authorize(inputs ?? {})`: `inputs` holds the answers to a method's prompts, and a method with no `prompts` gets `{}`. An `authorize` that looked for the key in `inputs` therefore saw an empty key on every login. OpenCode's own providers declare `api` methods the same way, and its desktop returns before an api method's `authorize` is reached.
+- **The edition is read at request time, not at sign-in.** With no `authorize` to record it, `editionOf(key)` in the loader is what puts `x-longcat-edition` on a request.
