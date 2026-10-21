@@ -42,11 +42,6 @@ export function isRetired(id) {
   return Object.hasOwn(RETIRED, id);
 }
 
-/** Why the platform retired an id, for the error an agent sees. */
-export function retiredReason(id) {
-  return RETIRED[id];
-}
-
 /**
  * The capabilities of a LongCat model, in the internal Model shape OpenCode
  * reads: the same field names models.dev uses, nested under `capabilities`.

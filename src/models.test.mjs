@@ -8,7 +8,6 @@ import {
   isRetired,
   isValidId,
   modelsEndpoint,
-  retiredReason,
 } from "./models.mjs";
 
 const BASE = "https://api.longcat.chat";
@@ -52,10 +51,9 @@ test("a model id is validated before it is offered", () => {
   expect(isValidId("has space")).toBe(false);
 });
 
-test("retired models are named, with the reason", () => {
+test("retired models are named", () => {
   expect(isRetired("LongCat-Flash-Chat")).toBe(true);
   expect(isRetired("LongCat-2.0")).toBe(false);
-  expect(retiredReason("LongCat-Flash-Chat")).toContain("LongCat-2.0");
 });
 
 test("the config hook declares the provider and both models", () => {

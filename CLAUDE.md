@@ -6,7 +6,7 @@ Guidance for agents working in this repository.
 
 An OpenCode provider plugin for the LongCat API platform. One plugin function (`src/provider.mjs`) declares one provider (`opencode-longcat-auth`), its models, an API-key login, and a fetch that sends each account's requests to the platform.
 
-It also runs under magpie, which reads extra fields (`auth.usage`, `auth.refresh`, `auth.icon`, `auth.maxConcurrency`, the `X-Magpie-Sign-In` header) that OpenCode ignores.
+It also runs under magpie, which reads extra fields (`auth.usage`, `auth.refresh`, `auth.icon`, `auth.maxConcurrency`) that OpenCode ignores.
 
 ## Commands
 

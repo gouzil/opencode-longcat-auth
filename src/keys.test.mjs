@@ -1,37 +1,5 @@
 import { test, expect } from "bun:test";
-import {
-  editionOf,
-  fingerprint,
-  fromEnv,
-  isPlatformKey,
-  isUnusable,
-} from "./keys.mjs";
-
-test("the key is read from the plugin's own variable first", () => {
-  const env = {
-    OPENCODE_LONGCAT_API_KEY: "ak_override",
-    LONGCAT_API_KEY: "ak_env",
-  };
-  expect(fromEnv(env)).toEqual({
-    env: "OPENCODE_LONGCAT_API_KEY",
-    key: "ak_override",
-  });
-});
-
-test("the platform's own variable is read when the override is absent", () => {
-  expect(fromEnv({ LONGCAT_API_KEY: "ak_env" })).toEqual({
-    env: "LONGCAT_API_KEY",
-    key: "ak_env",
-  });
-});
-
-test("nothing is read when neither variable is set", () => {
-  expect(fromEnv({})).toEqual({ env: undefined, key: undefined });
-});
-
-test("whitespace around a key is trimmed", () => {
-  expect(fromEnv({ LONGCAT_API_KEY: "  ak_x  " }).key).toBe("ak_x");
-});
+import { editionOf, fingerprint, isPlatformKey, isUnusable } from "./keys.mjs";
 
 test("a key in the platform's shape is recognised", () => {
   expect(isPlatformKey("ak_0123456789abcdef")).toBe(true);

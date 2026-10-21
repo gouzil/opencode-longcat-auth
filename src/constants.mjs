@@ -28,9 +28,6 @@ export const PROVIDER = "opencode-longcat-auth";
 /** Human readable name shown next to the provider id. */
 export const PROVIDER_NAME = "LongCat";
 
-/** The id OpenCode's built-in provider uses, for the config snippet in the README. */
-export const BUILTIN_PROVIDER_ID = "longcat";
-
 /** Icon used by magpie's plugin cards and provider rows. */
 export const ICON =
   "https://s3plus.meituan.net/elsa-multimedia-data/longcat/logo-group.svg";
@@ -43,7 +40,6 @@ export const SDK = Object.freeze({
 
 /** LongCat's own docs for this plugin. */
 export const DOCS = "https://longcat.chat/platform/docs/zh/open-code";
-export const API_DOCS = "https://longcat.chat/platform/docs/zh/api-docs";
 export const API_KEYS = "https://longcat.chat/platform/api_keys";
 
 /** Environment variable the platform accepts for the API key. */
@@ -67,8 +63,6 @@ export const EDITIONS = Object.freeze({
     apiBase: "https://api.longcat.ai",
   },
 });
-
-export const DEFAULT_EDITION = EDITIONS.cn;
 
 /** Built-in model limits. Sources: docs' "模型参数参考" and pricing pages. */
 export const MODEL_LIMITS = Object.freeze({
@@ -95,7 +89,10 @@ export const MODEL_LIMITS = Object.freeze({
   }),
 });
 
-/** Models no longer served by the platform, kept so an old model id says why. */
+/**
+ * Models no longer served by the platform. Kept so an old model id can be
+ * recognised and left out, rather than offered and refused at request time.
+ */
 export const RETIRED = Object.freeze({
   "LongCat-Flash-Chat":
     "retired on 2026-05-29, migrate to LongCat-2.0 or LongCat-2.5-Preview",
@@ -131,5 +128,9 @@ export const EFFORT_VARIANTS = Object.freeze({
 export const USER_AGENT = "opencode-longcat-auth/0.1.0";
 export const CLIENT_HEADER = "x-opencode-longcat-client";
 
-/** How long a metadata read is waited for before falling back. */
-export const METADATA_TIMEOUT_MS = 15000;
+/**
+ * How long a model-list read is waited for before the catalog is used. The
+ * platform is far away from some users, so the catalog is kept rather than the
+ * account dropped when the list is slow.
+ */
+export const DISCOVERY_TIMEOUT_MS = 15000;

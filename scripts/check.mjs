@@ -8,7 +8,7 @@
  * caught before it reaches a user.
  */
 
-import { readdir } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -156,11 +156,7 @@ for (const entry of entries) {
 }
 
 // The package must be publishable as magpie and OpenCode both load it.
-const pkg = JSON.parse(
-  await (
-    await import("node:fs/promises")
-  ).readFile(path.join(root, "package.json"), "utf8"),
-);
+const pkg = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
 check(
   "package.json names the package",
   typeof pkg.name === "string" && pkg.name.length > 0,

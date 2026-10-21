@@ -11,31 +11,17 @@
  */
 
 import {
-  API_DOCS,
-  API_KEY_ENV,
   API_KEYS,
-  DOCS,
+  DISCOVERY_TIMEOUT_MS,
   EDITIONS,
   ICON,
   PROVIDER,
-  PROVIDER_NAME,
-  SDK,
   USER_AGENT,
 } from "./constants.mjs";
 import { editionOf, fingerprint, isPlatformKey, isUnusable } from "./keys.mjs";
-import {
-  buildModels,
-  configModels,
-  configProvider,
-  discoverModels,
-  isRetired,
-  retiredReason,
-} from "./models.mjs";
+import { buildModels, configProvider, discoverModels } from "./models.mjs";
 import { chatHeaders, createFetch } from "./fetch.mjs";
 import { thinkingFor } from "./thinking.mjs";
-
-/** How long a model-list read is waited for before the catalog is used. */
-const DISCOVERY_TIMEOUT_MS = 15000;
 
 /**
  * The plugin.
@@ -124,7 +110,12 @@ export const LongCatAuthPlugin = async (input, options = {}) => {
         const key = auth ? readKey(auth) : undefined;
         if (!key) return { plan: "API 按量付费", windows: [] };
 
-        const { error } = await discoverModels({ apiBase, key, fetchImpl });
+        const { error } = await discoverModels({
+          apiBase,
+          key,
+          fetchImpl,
+          timeoutMs: DISCOVERY_TIMEOUT_MS,
+        });
         return error
           ? { plan: "API 按量付费", error, windows: [] }
           : { plan: "API 按量付费", windows: [] };
@@ -147,6 +138,7 @@ export const LongCatAuthPlugin = async (input, options = {}) => {
           apiBase,
           key,
           fetchImpl,
+          timeoutMs: DISCOVERY_TIMEOUT_MS,
         });
         if (error || ids.length === 0) {
           // The platform could not be read. Keep the catalog rather than
@@ -213,13 +205,3 @@ function readKey(auth) {
   if (auth.type === "wellknown") return auth.key ?? auth.token;
   return auth.key ?? auth.token;
 }
-
-export {
-  API_DOCS,
-  API_KEYS,
-  DOCS,
-  PROVIDER,
-  retiredReason,
-  DISCOVERY_TIMEOUT_MS,
-};
-export default LongCatAuthPlugin;

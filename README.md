@@ -45,7 +45,7 @@ You can also set the key in the environment instead:
 export LONGCAT_API_KEY=ak_…
 ```
 
-`OPENCODE_LONGCAT_API_KEY` is read too, and wins over `LONGCAT_API_KEY`, so a project can keep the key out of a shared environment.
+The plugin declares `LONGCAT_API_KEY` in its `env` field, so OpenCode reads it and signs requests with it without a stored account. Verified against OpenCode 1.19.3: a request sent with only that variable set is signed with it.
 
 The plugin refuses a key that is empty, has whitespace in it, or is the placeholder from the docs, before it is sent anywhere.
 

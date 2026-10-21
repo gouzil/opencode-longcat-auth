@@ -2,7 +2,6 @@ import { test, expect } from "bun:test";
 import {
   API_KEYS,
   CACHE_READ_COST_USD,
-  DEFAULT_EDITION,
   DOCS,
   EDITIONS,
   ICON,
@@ -23,7 +22,6 @@ test("the provider id is the platform's own", () => {
 test("both editions point at the documented endpoints", () => {
   expect(EDITIONS.cn.apiBase).toBe("https://api.longcat.chat");
   expect(EDITIONS.global.apiBase).toBe("https://api.longcat.ai");
-  expect(DEFAULT_EDITION).toBe(EDITIONS.cn);
 });
 
 test("the OpenAI-compatible format uses the chat SDK package", () => {

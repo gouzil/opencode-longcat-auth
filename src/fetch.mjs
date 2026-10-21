@@ -40,11 +40,11 @@ export function protocolOf(input) {
 /**
  * The fetch.
  *
- * `options.onHeader` is called with each response's headers, for a caller that
- * needs the sign-in marker without consuming the body.
+ * `options.fetchImpl` stands in for the global fetch, so a test can read what
+ * was sent without a request leaving the process.
  */
 export function createFetch(options = {}) {
-  const { fetchImpl = fetch, onHeader } = options;
+  const { fetchImpl = fetch } = options;
 
   return async function longcatFetch(input, init = {}) {
     const protocol = protocolOf(input);
@@ -66,8 +66,6 @@ export function createFetch(options = {}) {
         `LongCat could not be reached: ${error?.message ?? error}`,
       );
     }
-
-    onHeader?.(response.headers);
 
     if (isAuthFailure(response.status)) {
       throw signInExpired(response.status, await readJson(response));
