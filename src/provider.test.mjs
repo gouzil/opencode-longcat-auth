@@ -130,14 +130,16 @@ test("the models hook adds a model the platform lists", async () => {
 
 test("the models hook takes the price the platform publishes for a model", async () => {
   // The platform can change a rate without a release, so the plugin asks each
-  // model what it costs rather than trusting the table it shipped with.
+  // model what it costs rather than trusting the table it shipped with. The
+  // endpoint answers the *yuan* table, so a rate it doubled here lands on the
+  // model as dollars — the conversion is the endpoint's job, not the hook's.
   const hooks = await plugin({
     fetchImpl: async (url) => {
       if (String(url).endsWith("/models/LongCat-2.5-Preview")) {
         return new Response(
           JSON.stringify({
             id: "LongCat-2.5-Preview",
-            pricing: { prompt: "9", completion: "9", cached_tokens: "3" },
+            pricing: { prompt: "20", completion: "80", cached_tokens: "0.8" },
           }),
           { status: 200 },
         );
@@ -156,9 +158,9 @@ test("the models hook takes the price the platform publishes for a model", async
     { auth: { type: "api", key: "ak_0123456789abcdef" } },
   );
   expect(models["LongCat-2.5-Preview"].cost).toEqual({
-    input: 9,
-    output: 9,
-    cache: { read: 3, write: 0 },
+    input: 3,
+    output: 12,
+    cache: { read: 0.12, write: 0 },
   });
 });
 

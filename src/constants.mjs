@@ -86,6 +86,10 @@ export const EDITIONS = Object.freeze({
  * These are the platform's *discounted* rates: the page calls them 折扣价 / 限时
  * and says the platform and its billing records are authoritative. Treat them
  * as a floor on nothing and a hint on everything else.
+ *
+ * These are the **dollar** half of that page. The model-detail endpoint publishes
+ * the *yuan* half (¥2 / ¥8 / ¥0.04) on both editions, which is why
+ * `discoverPrice` converts rather than copying.
  */
 export const PRICES = Object.freeze({
   /** Uncached input, the ordinary prompt tokens. */
@@ -97,6 +101,17 @@ export const PRICES = Object.freeze({
    * prompt cache worth turning on. */
   cacheRead: 0.006,
 });
+
+/**
+ * The yuan-to-dollar rate the platform's own two tables imply, as dollars per
+ * yuan: ¥2 = $0.30, ¥0.04 = $0.006 and ¥8 = $1.20 all divide by the same
+ * 6.666…, which is 20/3. Written as its reciprocal so the conversion
+ * multiplies exactly — `2 * (3/20)` is `0.3`, where `2 / 6.667` is not.
+ *
+ * The model-detail endpoint publishes the **yuan** table on both editions, so
+ * this is what turns a live read into the dollars OpenCode's `cost` field is in.
+ */
+export const USD_PER_CNY = 3 / 20;
 
 /** Built-in model limits. Source: the docs' "模型参数参考" page. */
 export const MODEL_LIMITS = Object.freeze({

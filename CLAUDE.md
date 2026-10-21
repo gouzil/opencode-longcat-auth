@@ -61,7 +61,9 @@ Tests live beside the module they cover: `src/keys.test.mjs` tests `src/keys.mjs
 
 **A cost is flat in the config hook, nested in the resolved Model.** The two halves name the prompt-cache rate differently: a config entry carries models.dev's `cache_read`/`cache_write`, a resolved Model carries `cache.read`/`cache.write`. The config hook must use the flat names — a nested `cache` there is silently dropped by OpenCode's converters, which would price every cached token at the full input rate. `mergeCost` in `src/models.mjs` is the only place the two are joined, and it emits the nested shape alone.
 
-**Prices are per million tokens, in the platform's own units.** `PRICES` in `src/constants.mjs` is the platform's discounted table, and models.dev — whose `cost` object OpenCode reads directly — stores the same convention (`anthropic/claude-sonnet-4-6` is `{"input":3,"output":15}`, Anthropic's $3/$15 per 1M). A factor of 10^6 wrong here is the difference between a session costing cents and costing a fortune. `scripts/check.mjs` asserts the published numbers on both halves, so a regression fails CI rather than shipping.
+**Prices are per million tokens, in dollars.** `PRICES` in `src/constants.mjs` is the platform's discounted **dollar** table, and models.dev — whose `cost` object OpenCode reads directly — stores the same convention (`anthropic/claude-sonnet-4-6` is `{"input":3,"output":15}`, Anthropic's $3/$15 per 1M). A factor of 10^6 wrong here is the difference between a session costing cents and costing a fortune. `scripts/check.mjs` asserts the published numbers on both halves, so a regression fails CI rather than shipping.
+
+**The model-detail endpoint publishes the yuan table, not the dollar one.** `GET /openai/v1/models/{id}` answers `{"pricing":{"prompt":"2","completion":"8","cached_tokens":"0.04"}}` on **both** editions — the global one too, whose docs show it beside the dollar table. `discoverPrice` converts by `USD_PER_CNY` and the converted value is what reaches the model. Copying the endpoint's numbers straight onto `cost` would put a 6.67× overcharge on every session, which is worse than the zero price it replaced. `USD_PER_CNY` is the _reciprocal_ of the page's 6.666… (`3/20`), so `2 * (3/20)` is exactly `0.3` while `2 / 6.667` is `0.2999850007499625`.
 
 **The config hook declares the models.** OpenCode resolves a provider's models from the config when the config has them and does not then call `provider.models`. Declaring them in `config` is what puts them in the picker; `provider.models` then re-reads them per account. Do not move the declaration out of `config`.
 
@@ -97,6 +99,15 @@ These were established by running the real binary, not by reading its source. Th
 - `opencode run` leaves a TUI behind when its output is a pipe, so it must be run with a timeout.
 - **A cost is per million tokens, and the config hook wants it flat.** OpenCode's runtime price function divides by `1e6` (`…mul($(R?.input??0)).div(1e6)`), and models.dev — the source OpenCode's own providers come from — stores the same convention. Its config-hook converters read `cache_read`/`cache_write`, not a nested `cache`; the nested form belongs to the resolved `Model` that `provider.models` returns.
 - **A model's cost is read, not decorative.** The runtime computes a per-message cost from `cost` and a session total is their sum, displayed in USD with no conversion. A model with `cost.input === 0` does not show as cheap — it shows as free, and the whole session reads as $0.00.
+
+## Verified against the LongCat platform
+
+These were established by fetching the platform's own endpoints and docs, not by reading its source.
+
+- **The model-detail endpoint answers the yuan table, on both editions.** `GET /openai/v1/models/LongCat-2.5-Preview` returns `{"pricing":{"prompt":"2","completion":"8","cached_tokens":"0.04"}}` from `api.longcat.chat` _and_ `api.longcat.ai`. The docs' own example payload is the same yuan numbers, on every edition. The dollar table lives only on the pricing pages.
+- **The endpoint is not a usable liveness check.** It answers `200` with a `pricing` body for a key it has never seen, as long as the key is past a length threshold (probed: `ak_` + 27 digits answers 200, +26 answers 401 `incorrect api key`). The model-list endpoint refuses an unrecognised key outright. This is why `auth.usage` keys on the model-list read and not on this one.
+- **The pricing pages carry both currencies, and they are a fixed conversion.** `¥2 / ¥0.04 / ¥8` and `$0.30 / $0.006 / $1.20` are the same rates; the two editions differ only in billing currency.
+- **The discounted rates are explicitly limited-time.** The page calls them 折扣价 / 限时 and says the platform's own page and billing records are authoritative, so the built-in table is a hint and not a quote.
 
 ## Verified against magpie's plugin host
 
