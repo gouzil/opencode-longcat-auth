@@ -75,7 +75,7 @@ export function capabilities({ reasoning = true, image = false } = {}) {
  * request lands on `…/openai/v1/chat/completions` — the endpoint the platform
  * documents. The loader's baseURL is the platform root; this is the path under it.
  */
-export function toModel(entry, apiBase) {
+function toModel(entry, apiBase) {
   return {
     id: entry.id,
     name: entry.name,

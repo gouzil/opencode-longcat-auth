@@ -19,12 +19,13 @@ const root = path.resolve(import.meta.dirname, "..");
 const PLATFORM_KEY = /\bak_[A-Za-z0-9_-]{32,}\b/g;
 
 /**
- * The placeholders this repository uses on purpose: the docs' standing-in, and
- * the fixtures the tests and the sandbox sign with. Each is short enough to be
+ * The fixtures the tests and the sandbox sign with. Each is short enough to be
  * obviously not a key, and each is named for it.
+ *
+ * An entry shorter than `PLATFORM_KEY`'s 32-character floor can never match, so
+ * it is dead weight here: the docs' `ak_…` standing-in was exactly that.
  */
 const ALLOWED = new Set([
-  "ak_…", // the README and CONTRIBUTING standing-in
   "ak_test_0123456789", // scripts/check.mjs
   "ak_sandbox_0123456789", // scripts/try.mjs
   "ak_0123456789abcdef", // the src test fixtures
