@@ -147,7 +147,7 @@ bun run ci        # fmt:check, test, check
 `bun run try` runs the plugin in a sandbox against a local stand-in for the LongCat API — it starts the stand-in itself, so no request leaves the machine, no real key is needed, and nothing is left running afterwards:
 
 ```bash
-bun run try          # uses opencode from PATH
+bun run try          # uses $OPENCODE, then opencode from PATH
 bun run try /path/to/opencode
 ```
 

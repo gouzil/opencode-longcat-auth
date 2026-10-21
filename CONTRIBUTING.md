@@ -37,7 +37,9 @@ If your change touches what the hooks produce, also run the end-to-end check:
 bun run try
 ```
 
-It needs an `opencode` binary on `PATH`. It builds a throwaway HOME, points the plugin at a local stand-in for the LongCat API, and reports the models the picker lists and the request a session sends. The unit tests do not load OpenCode, so they cannot catch a shape OpenCode rejects — this can.
+It needs an `opencode` binary: pass its path as the argument, or set `$OPENCODE`, or have `opencode` on `PATH`. It builds a throwaway HOME, points the plugin at a local stand-in for the LongCat API, and reports the models the picker lists and the request a session sends. The unit tests do not load OpenCode, so they cannot catch a shape OpenCode rejects — this can.
+
+A binary that is not there is reported as such. If it were not, the run would look like a plugin that listed no models, and you would go looking in the wrong place.
 
 ## What to know before you change things
 

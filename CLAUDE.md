@@ -20,7 +20,7 @@ bun run ci          # fmt:check + test + check
 bun run try         # end-to-end against a local stand-in; needs opencode
 ```
 
-`bun run ci` is what CI runs. `bun run try` needs an `opencode` binary and is not part of CI.
+`bun run ci` is what CI runs. `bun run try` needs an `opencode` binary — its path as the argument, or `$OPENCODE`, or `opencode` on `PATH` — and is not part of CI.
 
 ## The git hook
 
@@ -78,6 +78,8 @@ Tests live beside the module they cover: `src/keys.test.mjs` tests `src/keys.mjs
 `bun run check` loads `index.mjs` and `src/provider.mjs` the way magpie does and asserts the hooks and their shape. It is the guard against a hook that stopped being returned.
 
 `bun run try` is the only check that runs the real binary. It builds a throwaway HOME, points the plugin at `scripts/mock.mjs`, and reports the models the picker lists and the request a session sends. Run it after changing anything the hooks produce — the unit tests do not load OpenCode, so they cannot catch a shape OpenCode rejects.
+
+It takes the binary from its argument, then `$OPENCODE`, then `opencode` on `PATH`. A binary it cannot run is reported by name: opencode produces no output in that case, and an empty listing would read as a plugin that declared no models.
 
 ## Verified against OpenCode 1.19.3
 

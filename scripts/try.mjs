@@ -3,8 +3,12 @@
  *
  *   bun scripts/try.mjs [opencode-path]
  *
- * This starts the stand-in for the LongCat API itself, so it needs nothing but
- * opencode and a port. The stand-in is stopped when the run ends.
+ * The binary is taken from the argument, then `OPENCODE`, then `opencode` on
+ * PATH. A binary that cannot be run is reported as such rather than as a plugin
+ * that listed no models — the two look alike otherwise.
+ *
+ * This starts the stand-in for the LongCat API itself, so it needs nothing else.
+ * The stand-in is stopped when the run ends.
  *
  * The plugin is copied into a throwaway HOME, so your own config, auth.json and
  * sessions are untouched. The sandbox is pointed at the stand-in, so no request
@@ -22,7 +26,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 const root = path.resolve(import.meta.dirname, "..");
-const bin = process.argv[2] ?? "opencode";
+const bin = process.argv[2] ?? process.env.OPENCODE ?? "opencode";
 const port = Number(process.env.MOCK_PORT ?? 4100);
 const mock = `http://127.0.0.1:${port}`;
 
@@ -102,7 +106,13 @@ const reset = async () => {
   } catch {}
 };
 
-/** Run opencode in the sandbox. `run` leaves a TUI behind, so it is bounded. */
+/**
+ * Run opencode in the sandbox. `run` leaves a TUI behind, so it is bounded.
+ *
+ * A binary that is not there, or is not executable, is not a run that failed —
+ * opencode produced nothing at all, and reporting that as "no models listed"
+ * sends the reader looking at the plugin. The cause is named instead.
+ */
 function run(args, timeout = 90000) {
   const result = spawnSync(bin, args, {
     env,
@@ -110,9 +120,16 @@ function run(args, timeout = 90000) {
     encoding: "utf8",
     timeout,
   });
+  // `run` leaves its TUI behind, so the timeout below is the normal way a chat
+  // ends rather than a failure — the request it came to make is already recorded.
+  const timedOut = result.error?.code === "ETIMEDOUT";
+  if (result.error && !timedOut) {
+    throw new Error(`could not run ${bin}: ${result.error.message}`);
+  }
   return {
     status: result.status,
     signal: result.signal ?? null,
+    timedOut,
     out: `${result.stdout ?? ""}\n${result.stderr ?? ""}`,
   };
 }
