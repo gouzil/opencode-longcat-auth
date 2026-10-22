@@ -11,6 +11,7 @@ import {
   PROVIDER_NAME,
   RETIRED,
   SDK,
+  USD_PER_CNY,
   USER_AGENT,
 } from "./constants.mjs";
 
@@ -41,6 +42,17 @@ test("the published rates are carried, per million tokens", () => {
   expect(PRICES.input).toBe(0.3);
   expect(PRICES.output).toBe(1.2);
   expect(PRICES.cacheRead).toBe(0.006);
+});
+
+test("the yuan table converts to the dollar table exactly", () => {
+  // The model-detail endpoint publishes the *yuan* rates, so a live read has to
+  // be converted into the dollars OpenCode's `cost` field is in. The rate is the
+  // reciprocal of the page's 6.666… so the products come out exact: `2 * (3/20)`
+  // is `0.3`, where `2 / 6.667` is 0.2999850007499625 and would drift.
+  expect(2 * USD_PER_CNY).toBe(0.3);
+  expect(8 * USD_PER_CNY).toBe(1.2);
+  expect(0.04 * USD_PER_CNY).toBe(0.006);
+  expect(USD_PER_CNY).toBe(3 / 20);
 });
 
 test("the cached rate is a real discount on the input rate", () => {

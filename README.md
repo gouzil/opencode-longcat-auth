@@ -91,14 +91,14 @@ Every model the platform serves is priced by one table, so both models above cos
 | Input, cache hit         | $0.006        |
 | Output (incl. reasoning) | $1.20         |
 
-These are the platform's **discounted** rates. Its [pricing page](https://longcat.chat/platform/docs/zh/pricing) calls them a limited-time launch promotion and says its own page and billing records are authoritative where the two differ, so treat them as a guide rather than a quote. The platform quotes the same table in yuan (¥2 / ¥0.04 / ¥8) at a fixed conversion; the two editions differ only in the currency they bill in, not in price.
+These are the platform's **discounted** rates. Its [pricing page](https://longcat.chat/platform/docs/zh/api-pay-as-you-go) calls them a limited-time launch promotion and says its own page and billing records are authoritative where the two differ, so treat them as a guide rather than a quote. The same page quotes the table in yuan (¥2 / ¥0.04 / ¥8) at a fixed conversion; the two editions differ only in the currency they bill in, not in price.
 
 Two things worth knowing:
 
 - **Reasoning tokens are output tokens.** The platform bills `completion_tokens_details.reasoning_tokens` as part of completion, so thinking is charged at the output rate.
 - **A prompt cache is nearly free.** Cache hits cost a fiftieth of a cache miss, which is what makes leaving the cache on worthwhile.
 
-The plugin reads a model's price from the platform's own model-detail endpoint when it can, and falls back to the table above. Set your own rate per model in `opencode.json` if you have an enterprise discount — the platform tiers a further 10–40% off for verified enterprise accounts.
+The plugin also reads a model's price from the platform's own model-detail endpoint when it can, and falls back to the table above. That endpoint answers the **yuan** half of the same table (`prompt: "2"`, `completion: "8"`, `cached_tokens: "0.04"`) on both editions, so the plugin converts what it reads into the dollars OpenCode displays — at the conversion the two tables imply. Set your own rate per model in `opencode.json` if you have an enterprise discount — the platform tiers a further 10–40% off for verified enterprise accounts.
 
 ## Usage and balance
 
@@ -109,7 +109,9 @@ LongCat is prepaid pay-as-you-go: you top up a balance and the platform deducts 
 | OpenCode | What each session cost, at the rates above       |
 | magpie   | The plan name, and a pointer to the balance page |
 
-magpie's usage view has nowhere honest to put a number, because the plugin has no number to put there. Instead the account is marked usable when its key still reads the model list, which is what clears a "sign in again" prompt. Balance and monthly bills are on the platform's [usage page](https://longcat.chat/platform/usage), and top-ups on its [recharge page](https://longcat.chat/platform/cost/recharge).
+magpie's usage view has nowhere honest to put a number, because the plugin has no number to put there. Instead the account is marked usable when its key still reads the **model list**, which is what clears a "sign in again" prompt. Balance and monthly bills are on the platform's [usage page](https://longcat.chat/platform/usage), and top-ups on its [recharge page](https://longcat.chat/platform/cost/recharge).
+
+The model-detail endpoint is deliberately _not_ used for that check: it answers a request carrying any key of sufficient length with `200`, so a price read back says nothing about whether the key works. The model-list endpoint refuses a key it does not recognise, which is why the usage hook keys on it.
 
 ## Editions
 

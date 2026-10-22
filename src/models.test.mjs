@@ -238,14 +238,16 @@ test("discoverModels reports a network failure rather than throwing", async () =
   expect(error).toContain("ECONNREFUSED");
 });
 
-test("discoverPrice reads the rate the platform publishes for one model", async () => {
-  // The endpoint answers strings, not numbers, which is why `priceOf` parses.
+test("discoverPrice converts the yuan table the endpoint publishes into dollars", async () => {
+  // The endpoint answers strings, not numbers, and in *yuan* — ¥2 / ¥8 / ¥0.04 —
+  // which is the table the docs' own example shows. Copying it as dollars would
+  // put a 6.67× overcharge on every session, so it is converted here.
   const fetchImpl = async (url) => {
     expect(url).toBe(`${BASE}/openai/v1/models/LongCat-2.5-Preview`);
     return new Response(
       JSON.stringify({
         id: "LongCat-2.5-Preview",
-        pricing: { prompt: "0.3", completion: "1.2", cached_tokens: "0.006" },
+        pricing: { prompt: "2", completion: "8", cached_tokens: "0.04" },
       }),
       { status: 200 },
     );
@@ -257,6 +259,42 @@ test("discoverPrice reads the rate the platform publishes for one model", async 
     fetchImpl,
   });
   expect(price).toEqual({ input: 0.3, output: 1.2, cacheRead: 0.006 });
+});
+
+test("discoverPrice leaves a dollar table alone", async () => {
+  // The conversion is decided by the edition, not by the numbers: an endpoint
+  // that answers dollars must not be divided again.
+  const fetchImpl = async () =>
+    new Response(
+      JSON.stringify({
+        id: "LongCat-2.5-Preview",
+        pricing: { prompt: "0.3", completion: "1.2", cached_tokens: "0.006" },
+      }),
+      { status: 200 },
+    );
+  const { price } = await discoverPrice({
+    id: "LongCat-2.5-Preview",
+    apiBase: "https://api.longcat.ai",
+    key: "ak_x",
+    fetchImpl,
+  });
+  expect(price).toEqual({ input: 0.3, output: 1.2, cacheRead: 0.006 });
+});
+
+test("discoverPrice gives nothing back for a model the endpoint does not price", async () => {
+  // A 200 whose body carries no `pricing` is not a price. Inventing one would
+  // put a number on a model the platform never quoted.
+  const fetchImpl = async () =>
+    new Response(JSON.stringify({ id: "LongCat-2.5-Preview" }), {
+      status: 200,
+    });
+  const { price } = await discoverPrice({
+    id: "LongCat-2.5-Preview",
+    apiBase: BASE,
+    key: "ak_x",
+    fetchImpl,
+  });
+  expect(price).toBeUndefined();
 });
 
 test("discoverPrice gives nothing back when the endpoint is unreadable", async () => {

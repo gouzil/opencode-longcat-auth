@@ -204,6 +204,44 @@ for (const entry of entries) {
     usage?.signIn ?? "(none)",
   );
 
+  // The live-price read. The model-detail endpoint publishes the *yuan* table,
+  // so a rate read there must land on the model in the dollars OpenCode's cost
+  // function is in. A read copied across unconverted would put a 6.67×
+  // overcharge on every session, which is worse than the zero it replaced.
+  const pricedHooks = await candidates[0](
+    { project: {}, directory: root, client: {} },
+    {
+      fetchImpl: async (url) => {
+        if (/\/models\/[^/]+$/.test(String(url))) {
+          return new Response(
+            JSON.stringify({
+              id: "LongCat-2.5-Preview",
+              pricing: { prompt: "2", completion: "8", cached_tokens: "0.04" },
+            }),
+            { status: 200 },
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            object: "list",
+            data: [{ id: "LongCat-2.5-Preview" }],
+          }),
+          { status: 200 },
+        );
+      },
+    },
+  );
+  const priced = await pricedHooks.provider.models(
+    { models: {} },
+    { auth: { type: "api", key: "ak_test_0123456789" } },
+  );
+  const live = priced?.["LongCat-2.5-Preview"]?.cost;
+  check(
+    "a live yuan price lands on the model in dollars",
+    live?.input === 0.3 && live?.output === 1.2 && live?.cache?.read === 0.006,
+    `input=${live?.input} output=${live?.output} cache=${live?.cache?.read}`,
+  );
+
   // The loader must produce a fetch and a key.
   const loaderOptions = await hooks.auth.loader?.(async () => ({
     type: "api",

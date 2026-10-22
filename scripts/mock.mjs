@@ -21,13 +21,15 @@ const hits = [];
 const MODELS = ["LongCat-2.5-Preview", "LongCat-2.0", "LongCat-2.5-Flash"];
 
 /**
- * The rates the platform publishes, per million tokens.
+ * The rates the platform publishes, per million tokens, in the currency the
+ * model-detail endpoint answers in: **yuan**. The real endpoint answers
+ * `{"prompt":"2","completion":"8","cached_tokens":"0.04"}` on both editions,
+ * so a stand-in that answered dollars would let the conversion go untested.
  *
- * Mirrored from `src/constants.mjs` so the stand-in answers a model-detail read
- * the way the platform does. Kept here rather than imported so the sandbox
- * stays a plain script with no module graph of its own.
+ * Kept here rather than imported so the sandbox stays a plain script with no
+ * module graph of its own.
  */
-const PRICING = { prompt: "0.3", completion: "1.2", cached_tokens: "0.006" };
+const PRICING = { prompt: "2", completion: "8", cached_tokens: "0.04" };
 
 /** A JSON answer. `Bun.serve` wants a `Response`, not a Node-style writable. */
 function json(status, body) {

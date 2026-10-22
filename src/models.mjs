@@ -16,6 +16,7 @@ import {
   PROVIDER_NAME,
   RETIRED,
   SDK,
+  USD_PER_CNY,
   EFFORT_VARIANTS,
 } from "./constants.mjs";
 
@@ -223,6 +224,9 @@ export function buildModels({
     // cached half `cacheRead` where the catalog nests `cache.read`, so the
     // overlay is built rather than spread — a straight spread would leave the
     // cached rate behind. A user's own `cost` still wins over both.
+    //
+    // `discoverPrice` hands back dollars; the endpoint's own table is yuan and
+    // the conversion happens there, so nothing here divides again.
     const live = prices?.[model.id];
     const base = live
       ? {
@@ -364,7 +368,19 @@ export function modelEndpoint(id, apiBase = EDITIONS.cn.apiBase) {
   return `${modelsEndpoint(apiBase)}/${encodeURIComponent(id)}`;
 }
 
-/** A price in the platform's own shape, when every part of it is a number. */
+/**
+ * One model's price, in the platform's own yuan table.
+ *
+ * The endpoint answers `{"pricing":{"prompt":"2","completion":"8",
+ * "cached_tokens":"0.04"}}` — strings, not numbers, and yuan, not dollars. Both
+ * editions answer the yuan table; the global edition's docs carry it too, beside
+ * the dollar one. The unit is per million tokens, which the endpoint does not
+ * state: the numbers are the same ones the pricing pages label `¥/百万 Tokens`.
+ *
+ * This is deliberately **not** converted. A caller must not turn yuan into
+ * dollars on the assumption that the endpoint answered in dollars, which would
+ * put a 6.67× overcharge on every session.
+ */
 function priceOf(body) {
   const p = body?.pricing;
   if (!p || typeof p !== "object") return undefined;
@@ -378,14 +394,24 @@ function priceOf(body) {
   return { input, output, cacheRead };
 }
 
+/** The currency a model-detail price is answered in, for one edition. */
+function priceCurrency(apiBase) {
+  return apiBase === EDITIONS.global.apiBase ? "usd" : "cny";
+}
+
 /**
- * Read one model's own price from the platform's model-detail endpoint.
+ * Read one model's own price from the platform's model-detail endpoint, in the
+ * dollars OpenCode's `cost` field is in.
  *
- * The endpoint answers `{"pricing":{"prompt":"2","completion":"8",
- * "cached_tokens":"0.04"}}` — strings, not numbers — and does not state a unit,
- * so the numbers are taken as per million tokens, matching the pricing page they
- * are the same numbers as. Returns `undefined` when the endpoint cannot be read
- * or answers something else, and the caller keeps its built-in table.
+ * The endpoint publishes the yuan table, so the read is converted by the rate
+ * the platform's own two tables imply. Returns `undefined` when the endpoint
+ * cannot be read or does not price the model, and the caller keeps its built-in
+ * table — a price is never invented for a model the endpoint did not price.
+ *
+ * The endpoint also answers a bogus key with 200 (an unrecognised key is refused
+ * only once its length is past a threshold, and a short one is refused as
+ * `incorrect api key`), so a price this read returns is not proof the key works.
+ * The model-list read in `discoverModels` is what the usage hook keys on.
  */
 export async function discoverPrice({
   id,
@@ -406,7 +432,17 @@ export async function discoverPrice({
       signal: controller.signal,
     });
     if (!response.ok) return { price: undefined };
-    return { price: priceOf(await response.json()) };
+    const raw = priceOf(await response.json());
+    if (!raw) return { price: undefined };
+    // A table that is already dollars needs no conversion; the yuan one does.
+    const rate = priceCurrency(apiBase) === "usd" ? 1 : USD_PER_CNY;
+    return {
+      price: {
+        input: raw.input * rate,
+        output: raw.output * rate,
+        cacheRead: raw.cacheRead * rate,
+      },
+    };
   } catch {
     return { price: undefined };
   } finally {
