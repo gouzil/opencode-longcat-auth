@@ -30,7 +30,7 @@ export const PROVIDER_NAME = "LongCat";
 
 /** Icon used by magpie's plugin cards and provider rows. */
 export const ICON =
-  "https://s3plus.meituan.net/elsa-multimedia-data/longcat/logo-group.svg";
+  "https://s3plus.meituan.net/aigc-media-resources/longcat/yeqian-logo.svg";
 
 /** The AI SDK packages each API format is driven by. */
 export const SDK = Object.freeze({
