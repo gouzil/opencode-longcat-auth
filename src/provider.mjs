@@ -25,6 +25,7 @@ import {
   discoverModels,
   discoverPrice,
 } from "./models.mjs";
+import { isAuthFailure } from "./errors.mjs";
 import { chatHeaders, createFetch } from "./fetch.mjs";
 import { thinkingFor } from "./thinking.mjs";
 
@@ -114,17 +115,27 @@ export const LongCatAuthPlugin = async (input, options = {}) => {
         const key = auth ? readKey(auth) : undefined;
         if (!key) return { plan: PLAN, windows: [] };
 
-        const { error } = await discoverModels({
+        const { error, status } = await discoverModels({
           apiBase,
           key,
           fetchImpl,
           timeoutMs: DISCOVERY_TIMEOUT_MS,
         });
         if (error) {
-          // The key could not be used, so the account is marked. magpie shows
-          // this where the quota window would be and stops sending it requests
-          // until it is signed in again.
-          return { plan: PLAN, error, signIn: "expired", windows: [] };
+          // Only a refused key (401/403) means the account must sign in again.
+          // A timeout, a 5xx, or a network failure is the platform being
+          // unreachable — not a dead key — and marking the account would make
+          // one blip look like a logout. The error is still reported, but the
+          // account keeps its sign-in.
+          return {
+            plan: PLAN,
+            error,
+            signIn:
+              status !== undefined && isAuthFailure(status)
+                ? "expired"
+                : "kept",
+            windows: [],
+          };
         }
         return { plan: PLAN, signIn: "kept", windows: [] };
       },

@@ -216,13 +216,30 @@ test("discoverModels reads the platform's list", async () => {
 test("discoverModels reports a refusal rather than throwing", async () => {
   const fetchImpl = async () =>
     new Response(JSON.stringify({ error: { message: "no" } }), { status: 401 });
-  const { ids, error } = await discoverModels({
+  const { ids, error, status } = await discoverModels({
     apiBase: BASE,
     key: "ak_x",
     fetchImpl,
   });
   expect(ids).toEqual([]);
   expect(error).toContain("401");
+  // The status is what lets the caller tell a refused key from a dead platform.
+  expect(status).toBe(401);
+});
+
+test("discoverModels carries no status for a failure with no response", async () => {
+  // A timeout or a network failure has no HTTP status, and a caller that read
+  // `status` as "the key was refused" would mark the account on a blip.
+  const fetchImpl = async () => {
+    throw new Error("ECONNREFUSED");
+  };
+  const { error, status } = await discoverModels({
+    apiBase: BASE,
+    key: "ak_x",
+    fetchImpl,
+  });
+  expect(error).toContain("ECONNREFUSED");
+  expect(status).toBeUndefined();
 });
 
 test("discoverModels reports a network failure rather than throwing", async () => {
