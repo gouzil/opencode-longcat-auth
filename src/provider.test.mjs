@@ -267,7 +267,23 @@ test("magpie's usage hook reports the plan and keeps a working key", async () =>
   expect(usage.signIn).toBe("kept");
 });
 
-test("magpie's usage hook marks an account whose key stopped working", async () => {
+test("magpie's usage hook marks an account whose key was refused", async () => {
+  // Only a 401/403 is a refused key. The account is marked, because that is
+  // the one read that proves the key no longer works.
+  const hooks = await plugin({
+    fetchImpl: async () => new Response("nope", { status: 401 }),
+  });
+  const usage = await hooks.auth.usage(async () => ({
+    type: "api",
+    key: "ak_0123456789abcdef",
+  }));
+  expect(usage.error).toContain("401");
+  expect(usage.signIn).toBe("expired");
+});
+
+test("magpie's usage hook keeps the account when the platform is down", async () => {
+  // A 5xx is the platform being unreachable, not a dead key. Marking the
+  // account would make one blip look like a logout — the bug this guards.
   const hooks = await plugin({
     fetchImpl: async () => new Response("nope", { status: 500 }),
   });
@@ -276,7 +292,22 @@ test("magpie's usage hook marks an account whose key stopped working", async () 
     key: "ak_0123456789abcdef",
   }));
   expect(usage.error).toContain("500");
-  expect(usage.signIn).toBe("expired");
+  expect(usage.signIn).toBe("kept");
+});
+
+test("magpie's usage hook keeps the account when the platform times out", async () => {
+  // A timeout carries no status, so it must not be read as a refusal either.
+  const hooks = await plugin({
+    fetchImpl: async () => {
+      throw new Error("ECONNREFUSED");
+    },
+  });
+  const usage = await hooks.auth.usage(async () => ({
+    type: "api",
+    key: "ak_0123456789abcdef",
+  }));
+  expect(usage.error).toContain("ECONNREFUSED");
+  expect(usage.signIn).toBe("kept");
 });
 
 test("magpie's usage hook says nothing to claim when no key is stored", async () => {

@@ -346,7 +346,14 @@ export async function discoverModels({
       signal: controller.signal,
     });
     if (!response.ok)
-      return { ids: [], error: `LongCat answered HTTP ${response.status}` };
+      return {
+        ids: [],
+        error: `LongCat answered HTTP ${response.status}`,
+        // Carried so the caller can tell a refused key (401/403) from the
+        // platform being down (5xx) or unreachable (no status at all): only
+        // the former means the account must sign in again.
+        status: response.status,
+      };
     const body = await response.json();
     const data = Array.isArray(body?.data) ? body.data : [];
     return { ids: data.map((item) => item?.id).filter(isValidId) };
